@@ -60,78 +60,13 @@ tableBody.addEventListener('click', (e) => {
   row.classList.add('active');
 });
 
-const body = document.querySelector('body');
-const form = document.createElement('form');
-
-form.classList = 'new-employee-form';
-
-body.appendChild(form);
-
-function fieldCreate({
-  tag,
-  qa,
-  type = 'text',
-  labelText = '',
-  required = false,
-  options = [],
-}) {
-  const label = document.createElement('label');
-
-  if (labelText) {
-    label.textContent = labelText;
-  }
-
-  let field;
-
-  switch (tag) {
-    case 'input':
-      field = document.createElement('input');
-      field.type = type;
-      break;
-
-    case 'select':
-      field = document.createElement('select');
-
-      options.forEach((city) => {
-        const option = document.createElement('option');
-
-        option.value = city.toLowerCase().replace(/\s+/g, '-');
-        option.text = city;
-        field.appendChild(option);
-      });
-      break;
-
-    case 'button':
-      field = document.createElement('button');
-      field.type = type;
-      field.textContent = labelText;
-      break;
-
-    default:
-      throw new Error(`Unknown field type: ${tag}`);
-  }
-
-  if (qa) {
-    field.dataset.qa = qa;
-    field.name = qa;
-  }
-
-  if (tag === 'button') {
-    form.appendChild(field);
-  } else {
-    label.appendChild(field);
-    form.appendChild(label);
-  }
-
-  return field;
-}
-
-const formConfig = [
+const fieldConfigs = [
   {
     tag: 'input',
     qa: 'name',
     labelText: 'Name:',
     required: true,
+    rule: { minLength: 4 },
   },
 
   {
@@ -139,6 +74,7 @@ const formConfig = [
     qa: 'position',
     labelText: 'Position:',
     required: true,
+    rule: { minLength: 2 },
   },
 
   {
@@ -162,6 +98,7 @@ const formConfig = [
     type: 'number',
     labelText: 'Age:',
     required: true,
+    rule: { min: 18, max: 90 },
   },
 
   {
@@ -170,47 +107,75 @@ const formConfig = [
     type: 'number',
     labelText: 'Salary:',
     required: true,
+    parse: parseSalary,
+    format: (v) => '$' + Number(v).toLocaleString('en-US'),
   },
 
   {
     tag: 'button',
     type: 'submit',
-    labelText: 'Save to table',
+    textContent: 'Save to table',
   },
 ];
 
-const columnRules = {
-  0: {
-    name: 'name',
-    minLength: 4,
-  },
+const form = document.createElement('form');
 
-  1: {
-    name: 'position',
-    minLength: 2,
-  },
+form.classList = 'new-employee-form';
+form.setAttribute('novalidate', true);
+document.body.appendChild(form);
 
-  2: {
-    name: 'office',
-  },
+fieldConfigs.forEach((config) => {
+  const label = document.createElement('label');
 
-  3: {
-    name: 'age',
-    type: 'number',
-    min: 18,
-    max: 90,
-  },
+  if (config.labelText) {
+    label.textContent = config.labelText;
+  }
 
-  4: {
-    name: 'salary',
-    type: 'number',
-    min: 0,
-    parse: parseSalary,
-    format: (v) => '$' + Number(v).toLocaleString('en-US'),
-  },
-};
+  let field;
 
-function validateValue(value, rule) {
+  switch (config.tag) {
+    case 'input':
+      field = document.createElement('input');
+      field.type = config.type || 'text';
+      break;
+
+    case 'select':
+      field = document.createElement('select');
+
+      config.options.forEach((opt) => {
+        const option = document.createElement('option');
+
+        option.value = opt.toLowerCase().replace(/\s+/g, '-');
+        option.text = opt;
+        field.appendChild(option);
+      });
+      break;
+
+    case 'button':
+      field = document.createElement('button');
+      field.type = config.type;
+      field.textContent = config.textContent;
+      break;
+  }
+
+  if (config.qa) {
+    field.dataset.qa = config.qa;
+    field.name = config.qa;
+  }
+
+  field.required = config.required;
+
+  if (config.tag === 'button') {
+    form.appendChild(field);
+  } else {
+    label.appendChild(field);
+    form.appendChild(label);
+  }
+
+  return field;
+});
+
+function validate(value, rule) {
   if (value === '') {
     return false;
   }
@@ -223,89 +188,95 @@ function validateValue(value, rule) {
     return false;
   }
 
-  if (rule.type === 'number') {
-    const parsed = rule.parse ? rule.parse(value) : value;
-    const num = Number(parsed);
+  const num = Number(value);
 
-    if (Number.isNaN(num)) {
-      return false;
-    }
+  if (rule.min !== undefined && num < rule.min) {
+    return false;
+  }
 
-    if (rule.min !== undefined && num < rule.min) {
-      return false;
-    }
-
-    if (rule.max !== undefined && num > rule.max) {
-      return false;
-    }
+  if (rule.max !== undefined && num > rule.max) {
+    return false;
   }
 
   return true;
 }
 
-formConfig.forEach(fieldCreate);
-
 const pushNotification = (type, title, message) => {
-  const notification = document.createElement('div');
+  const n = document.createElement('div');
 
-  notification.dataset.qa = 'notification';
-  notification.classList.add('notification', type);
+  n.dataset.qa = 'notification';
+  n.classList.add('notification', type);
 
   const h = document.createElement('h2');
 
   h.textContent = title;
-  notification.appendChild(h);
+  n.appendChild(h);
 
   const p = document.createElement('p');
 
   p.textContent = message;
-  notification.appendChild(p);
+  n.appendChild(p);
 
-  document.body.appendChild(notification);
-
-  setTimeout(() => {
-    notification.remove();
-  }, 2000);
+  document.body.appendChild(n);
+  setTimeout(() => n.remove(), 2000);
 };
 
 form.addEventListener('submit', (e) => {
   e.preventDefault();
 
-  if (!form.checkValidity()) {
-    form.reportValidity();
+  const isValid = fieldConfigs.every((config) => {
+    const fieldName = config.qa;
 
+    if (!fieldName) {
+      return true;
+    }
+
+    const field = form.elements[fieldName];
+    let val;
+
+    if (field.tagName === 'SELECT') {
+      val = field.options[field.selectedIndex].text;
+    } else {
+      val = field.value.trim();
+    }
+
+    if (!validate(val, config.rule)) {
+      pushNotification('error', 'Error', `Invalid ${fieldName}`);
+      field.focus();
+
+      return false;
+    }
+
+    return true;
+  });
+
+  if (!isValid) {
     return;
   }
 
-  const newTr = document.createElement('tr');
+  const tr = document.createElement('tr');
 
-  for (const colIndex in columnRules) {
-    const rule = columnRules[colIndex];
-    const field = form.elements[rule.name];
-    let value = field.value.trim();
-
-    if (field.tagName === 'SELECT') {
-      value = field.options[field.selectedIndex].text;
-    }
-
-    if (!validateValue(value, rule)) {
-      pushNotification('error', 'Error', `Invalid ${rule.name}`);
-      field.focus();
-
+  fieldConfigs.forEach((config) => {
+    if (!config.qa) {
       return;
     }
 
-    if (rule.format) {
-      value = rule.format(value);
+    const field = form.elements[config.qa];
+    let fieldVal;
+
+    if (field.tagName.toUpperCase() === 'SELECT') {
+      fieldVal = field.options[field.selectedIndex].text;
+    } else {
+      fieldVal = field.value.trim();
     }
 
-    const newTd = document.createElement('td');
+    const td = document.createElement('td');
 
-    newTd.textContent = value;
-    newTr.appendChild(newTd);
-  }
+    td.textContent = config.format ? config.format(fieldVal) : fieldVal;
+    tr.appendChild(td);
+  });
 
-  tableBody.appendChild(newTr);
+  tableBody.appendChild(tr);
   pushNotification('success', 'Success!', 'Data added successfully');
   form.reset();
   form.elements.name.focus();
@@ -314,39 +285,41 @@ form.addEventListener('submit', (e) => {
 tableBody.addEventListener('dblclick', (e) => {
   const td = e.target.closest('td');
 
-  if (!td) {
+  if (!td || tableBody.querySelector('input.cell-input')) {
     return;
   }
 
-  if (td.querySelector('input')) {
+  const colIndex = td.cellIndex;
+  const config = fieldConfigs[colIndex];
+
+  if (!config || config.tag === 'button') {
     return;
   }
 
-  const initialData = td.textContent;
-
-  td.textContent = '';
+  const initialText = td.textContent;
 
   const input = document.createElement('input');
 
-  input.value = initialData;
+  input.classList.add('cell-input');
+
+  input.value = config.qa === 'salary' ? parseSalary(initialText) : initialText;
+
+  td.textContent = '';
   td.appendChild(input);
   input.focus();
 
-  const colIndex = td.cellIndex;
-  const rule = columnRules[colIndex];
+  const handleSave = () => {
+    const val = input.value.trim();
 
-  input.addEventListener('blur', () => {
-    const value = input.value.trim();
-
-    if (!validateValue(value, rule)) {
-      pushNotification('error', 'Error', `Invalid ${rule.name}`);
-      td.textContent = initialData;
-
-      return;
+    if (!validate(val, config.rule)) {
+      pushNotification('error', 'Error', `Invalid ${config.qa}`);
+      td.textContent = initialText;
+    } else {
+      td.textContent = config.format ? config.format(val) : val;
     }
+  };
 
-    td.textContent = rule.format ? rule.format(value) : value;
-  });
+  input.addEventListener('blur', handleSave);
 
   input.addEventListener('keydown', (evt) => {
     if (evt.key === 'Enter') {
@@ -354,8 +327,8 @@ tableBody.addEventListener('dblclick', (e) => {
     }
 
     if (evt.key === 'Escape') {
-      td.textContent = initialData;
-      input.remove();
+      input.removeEventListener('blur', handleSave);
+      td.textContent = initialText;
     }
   });
 });
