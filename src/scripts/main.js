@@ -18,11 +18,20 @@ table.addEventListener('click', (e) => {
     return;
   }
 
+  const allThs = table.querySelectorAll('th');
+  const colIndex = th.cellIndex;
+
   const currentOrder = th.dataset.order === 'asc' ? 'desc' : 'asc';
+
+  allThs.forEach((header) => {
+    if (header !== th) {
+      delete header.dataset.order;
+    }
+  });
 
   th.dataset.order = currentOrder;
 
-  sortTableByColumn(th.cellIndex, currentOrder);
+  sortTableByColumn(colIndex, currentOrder);
 });
 
 function sortTableByColumn(colIndex, order) {
